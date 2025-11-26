@@ -1,9 +1,3 @@
-Voici une proposition de **README.md** professionnel et structuré pour ton projet. Il est prêt à être copié-collé.
-
-Il met en valeur le travail effectué, explique comment lancer le code et décrit les fonctionnalités (y compris le bonus) pour le correcteur.
-
------
-
 # Projet 1 : Détection de Contours & Traitement d'Images
 
 Ce projet a été réalisé dans le cadre de la formation **Ingénieur Informatique Industrielle** (Traitement d'images). Il s'agit d'une application interactive permettant d'analyser et de comparer différentes méthodes de détection de contours sur des images.
@@ -63,7 +57,7 @@ Lors de l'utilisation, voici les comportements attendus (utiles pour la présent
 
 ## 👤 Auteurs
 
-  * **Étudiant 1** : [Ton Nom]
-  * **Étudiant 2** : [Nom de ton binôme]
+  * **Étudiant 1** : Fiona Pontoparia
+  * **Étudiant 2** : Benoit Serrain
   * **Formation** : Ingénieur Informatique Industrielle
-  * **Date** : Décembre 2025
+  * **Date** : 10 Décembre 2025
