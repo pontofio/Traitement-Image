@@ -25,6 +25,7 @@ from matplotlib.widgets import RadioButtons, Button, Slider
 import cv2
 import os
 import numpy as np
+import random
 
 # =============================================================================
 # 1. CONFIGURATION & INITIALISATION
@@ -59,11 +60,12 @@ fig = plt.figure(figsize=(16, 9))
 fig.canvas.manager.set_window_title('Projet 1 : Détection de Contours - Interactif')
 
 # --- Définition des zones (Rectangles [left, bottom, width, height]) ---
-rect_menu    = [0.02, 0.55, 0.20, 0.40]   # Menu de sélection des images (Haut Gauche)
-rect_btn     = [0.05, 0.48, 0.15, 0.05]   # Bouton ON/OFF Superposition
-rect_slider1 = [0.05, 0.40, 0.15, 0.03]   # Slider Seuil Min (Canny)
-rect_slider2 = [0.05, 0.35, 0.15, 0.03]   # Slider Seuil Max (Canny)
-rect_bonus   = [0.05, 0.25, 0.15, 0.06]   # Bouton Bonus Artistique
+rect_menu       = [0.02, 0.55, 0.20, 0.40]   # Menu de sélection des images (Haut Gauche)
+rect_btn        = [0.05, 0.48, 0.15, 0.05]   # Bouton ON/OFF Superposition
+rect_slider1    = [0.05, 0.40, 0.15, 0.03]   # Slider Seuil Min (Canny)
+rect_slider2    = [0.05, 0.35, 0.15, 0.03]   # Slider Seuil Max (Canny)
+rect_bonus      = [0.05, 0.25, 0.15, 0.06]   # Bouton Bonus Artistique
+rect_bonus_woaw = [0.05, 0.15, 0.15, 0.06]   # Bouton Bonus Artistique WOAW
 
 # Ajustement de la zone d'affichage des images (Laisser de la place à gauche pour le menu)
 plt.subplots_adjust(left=0.30, right=0.98, top=0.95, bottom=0.05, wspace=0.2, hspace=0.2)
@@ -100,6 +102,8 @@ s_canny_max = Slider(ax_slide2, 'Seuil Max', 0, 255, valinit=200, color='gray')
 # D. Bouton Bonus
 ax_btn_bonus = plt.axes(rect_bonus)
 btn_bonus = Button(ax_btn_bonus, '✏️ Bonus : Dessin', color='#ffebcd', hovercolor='#ffd700')
+ax_btn_bonus_woaw = plt.axes(rect_bonus_woaw)
+btn_bonus_woaw = Button(ax_btn_bonus_woaw, '✏️ Bonus : Dessin WOAW', color="#cab99e", hovercolor='#ffd700')
 
 # Variable globale pour suivre l'état du bouton (Vrai = Superposition activée)
 etat_superposition = True 
@@ -129,6 +133,40 @@ def superposer_contours(image_rgb, masque_gris):
     # 100% de l'image originale + 80% des contours rouges + gamma 0
     return cv2.addWeighted(image_rgb, 1.0, contours_couleur, 0.8, 0)
 
+def colorier_zones(dessin_noir_blanc):
+    """
+    dessin_noir_blanc : image avec fond blanc et traits noirs (0/255)
+    Retourne une image RGB colorée, chaque zone ayant une couleur différente.
+    """
+
+    # 1) Les traits noirs = murs (0), le reste = zones (1)
+    #    On convertit en masque binaire exploitable
+    masque = (dessin_noir_blanc == 255).astype(np.uint8)
+
+    # 2) Détection des zones connectées
+    nb_composantes, labels = cv2.connectedComponents(masque, connectivity=4)
+
+    # 3) Création de couleurs aléatoires
+    couleurs = {
+        i: np.array([
+            random.randint(40, 255),
+            random.randint(40, 255),
+            random.randint(40, 255)
+        ], dtype=np.uint8)
+        for i in range(1, nb_composantes)  # 0 = fond blanc
+    }
+
+    # 4) Construction de l’image colorée
+    h, w = labels.shape
+    image_color = np.full((h, w, 3), 255, np.uint8)  # fond blanc
+
+    for y in range(h):
+        for x in range(w):
+            label = labels[y, x]
+            if label != 0:  # 0 = fond
+                image_color[y, x] = couleurs[label]
+
+    return image_color
 
 def creer_dessin_trait(img_rgb, seuil1, seuil2):
     """
@@ -158,6 +196,29 @@ def creer_dessin_trait(img_rgb, seuil1, seuil2):
     dessin_rgb = cv2.cvtColor(dessin, cv2.COLOR_GRAY2RGB)
     
     return dessin_rgb
+
+def creer_dessin_trait_woaw(img_rgb, seuil1=100, seuil2=127):
+    """Combine dessin au trait + remplissage couleurs uniques."""
+    
+    # 1) Canny
+    gris = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+    flou = cv2.GaussianBlur(gris, (3, 3), 0)
+    edges = cv2.Canny(flou, seuil1, seuil2)
+
+    # 2) Inverser (traits noirs, fond blanc)
+    dessin = cv2.bitwise_not(edges)
+
+    # 3) Colorisation zone par zone
+    color = colorier_zones(dessin)
+
+    # 4) Replacer les traits noirs au-dessus
+    traits_noirs = cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
+    traits_noirs = cv2.threshold(traits_noirs, 1, 255, cv2.THRESH_BINARY_INV)[1]
+
+    # On applique les traits par AND logique
+    final = cv2.bitwise_and(color, traits_noirs)
+
+    return final
 
 
 # =============================================================================
@@ -202,6 +263,38 @@ def ouvrir_fenetre_bonus(event):
     
     # Calcul de l'effet artistique
     img_art = creer_dessin_trait(img_rgb, s1, s2)
+    
+    # Création de la fenêtre Popup
+    fig_bonus = plt.figure(figsize=(8, 8))
+    fig_bonus.canvas.manager.set_window_title(f'BONUS - Dessin au trait : {nom_image}')
+    
+    plt.imshow(img_art)
+    plt.title(f"Effet 'Line Art' (Canny Inversé)\nSeuils utilisés: {int(s1)} / {int(s2)}", fontsize=14)
+    plt.axis('off')
+    plt.show()
+
+
+def ouvrir_fenetre_bonus_woaw(event):
+    """
+    Ouvre une NOUVELLE fenêtre Matplotlib indépendante pour afficher le bonus.
+    Cela permet de ne pas écraser l'interface principale.
+    """
+    # Récupération de l'image active
+    nom_image = radio.value_selected
+    chemin = os.path.join(dossier_img, nom_image)
+    img_bgr = cv2.imread(chemin)
+    if img_bgr is None: return
+    
+    # Conversion BGR -> RGB
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    
+    # On utilise les valeurs actuelles des sliders pour que le dessin corresponde
+    # aux réglages que l'utilisateur vient de tester.
+    s1 = s_canny_min.val
+    s2 = s_canny_max.val
+    
+    # Calcul de l'effet artistique
+    img_art = creer_dessin_trait_woaw(img_rgb, s1, s2)
     
     # Création de la fenêtre Popup
     fig_bonus = plt.figure(figsize=(8, 8))
@@ -316,6 +409,7 @@ btn_superpo.on_clicked(basculer_superposition)
 s_canny_min.on_changed(update)
 s_canny_max.on_changed(update)
 btn_bonus.on_clicked(ouvrir_fenetre_bonus)
+btn_bonus_woaw.on_clicked(ouvrir_fenetre_bonus_woaw)
 
 # Premier appel pour afficher la première image au démarrage
 update()
