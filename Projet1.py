@@ -3,7 +3,7 @@ from matplotlib.widgets import RadioButtons
 import cv2
 import os
 import numpy as np
-#ok
+#ok ok ok 
 # --- 1. CONFIGURATION ---
 dossier_img = 'images'
 # Vérification du dossier
