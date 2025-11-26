@@ -3,7 +3,7 @@
 -------------------------------------------------------------------------------
 PROJET 1 : DÉTECTION DE CONTOURS
 -------------------------------------------------------------------------------
-Auteur      : [Ton Nom / Binôme] (ex: Lotfi Mostefaoui)
+Auteur      : FIona Pontoparia & Benoit Serrain
 Formation   : Ingénieur Informatique Industrielle
 Date        : Décembre 2025
 Description : 
