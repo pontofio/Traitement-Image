@@ -1,126 +1,94 @@
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RadioButtons, Slider
+from matplotlib.widgets import RadioButtons
 import cv2
 import os
 import numpy as np
 
 # --- 1. CONFIGURATION ---
 dossier_img = 'images'
-# On vérifie le dossier
+# Vérification du dossier
 if not os.path.exists(dossier_img):
     os.makedirs(dossier_img)
     print(f"Dossier '{dossier_img}' créé.")
     exit()
 
-# On récupère les images
+# Récupération des images
 fichiers = [f for f in os.listdir(dossier_img) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 if not fichiers:
     print("Aucune image trouvée.")
     exit()
 
-# Si la liste est trop longue, on garde les 20 premières
+# Limite à 20 images pour l'affichage
 if len(fichiers) > 20:
     fichiers = fichiers[:20]
-    print("Attention : Liste tronquee aux 20 premiers fichiers.")
 
-# --- 2. MISE EN PAGE (LAYOUT) ---
+# --- 2. MISE EN PAGE (INTERFACE) ---
 fig = plt.figure(figsize=(16, 9))
 
-# A. Zone des Contrôles (Gauche)
-rect_menu = [0.02, 0.4, 0.20, 0.55]   # Liste
-rect_s1   = [0.05, 0.25, 0.15, 0.03]  # Slider 1
-rect_s2   = [0.05, 0.15, 0.15, 0.03]  # Slider 2
+# A. Zone de Gauche (Menu)
+rect_menu = [0.02, 0.4, 0.20, 0.55] 
 
-# B. Zone des Images (Droite)
+# B. Zone de Droite (Images)
 plt.subplots_adjust(left=0.30, right=0.98, top=0.95, bottom=0.05, wspace=0.2, hspace=0.2)
 
-# --- 3. CRÉATION DES AXES D'IMAGES ---
-ax_overlay = plt.subplot(2, 2, 1) # Haut Gauche
-ax_sobel   = plt.subplot(2, 2, 2) # Haut Droite
-ax_lap     = plt.subplot(2, 2, 3) # Bas Gauche
-ax_canny   = plt.subplot(2, 2, 4) # Bas Droite
+# --- 3. PRÉPARATION DES 4 EMPLACEMENTS ---
+# On prépare les 4 sous-graphiques vides pour la suite
+ax_original = plt.subplot(2, 2, 1) # Haut Gauche
+ax_sobel    = plt.subplot(2, 2, 2) # Haut Droite (Vide pour l'instant)
+ax_lap      = plt.subplot(2, 2, 3) # Bas Gauche (Vide pour l'instant)
+ax_canny    = plt.subplot(2, 2, 4) # Bas Droite (Vide pour l'instant)
 
-for ax in [ax_overlay, ax_sobel, ax_lap, ax_canny]:
+# On enlève les axes (chiffres) partout pour faire propre
+for ax in [ax_original, ax_sobel, ax_lap, ax_canny]:
     ax.axis('off')
 
-# --- 4. CRÉATION DES WIDGETS ---
-
-# Fond gris esthétique
+# --- 4. CRÉATION DU MENU ---
+# Fond gris à gauche
 fig.patches.extend([plt.Rectangle((0, 0), 0.28, 1, fill=True, color='#f0f0f0', alpha=1, zorder=-1, transform=fig.transFigure)])
-fig.text(0.02, 0.96, "PANNEAU DE CONTROLE", fontsize=12, fontweight='bold', color='#333')
+fig.text(0.02, 0.96, "CHOIX DE L'IMAGE", fontsize=12, fontweight='bold', color='#333')
 
-# A. Liste de choix
+# Liste des fichiers
 ax_radio = plt.axes(rect_menu, facecolor='#e8e8e8')
 radio = RadioButtons(ax_radio, fichiers, active=0)
 
-# B. Sliders
-ax_seuil1 = plt.axes(rect_s1)
-ax_seuil2 = plt.axes(rect_s2)
-s_seuil1 = Slider(ax_seuil1, 'Seuil Min', 0, 255, valinit=100)
-s_seuil2 = Slider(ax_seuil2, 'Seuil Max', 0, 255, valinit=200)
-
-# --- 5. FONCTION DE TRAITEMENT ---
+# --- 5. FONCTION PRINCIPALE ---
 def update(val=None):
-    # 1. Récupérer l'image choisie
+    # 1. Récupérer le nom de l'image
     nom_image = radio.value_selected
     chemin = os.path.join(dossier_img, nom_image)
     
+    # 2. Charger l'image
     img_bgr = cv2.imread(chemin)
     if img_bgr is None: return
     
-    img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    # On convertit en RGB pour l'affichage correct des couleurs
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    # On convertit aussi en Gris (sera utile pour les futurs filtres)
+    img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
 
-    # 2. Récupérer seuils
-    th1 = s_seuil1.val
-    th2 = s_seuil2.val
+    # 3. Affichage - Case 1 : Image Originale
+    ax_original.clear()
+    ax_original.imshow(img_rgb)
+    ax_original.set_title("1. Image Originale")
+    ax_original.axis('off')
 
-    # 3. Traitements
-    # Sobel
-    gx = cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=3)
-    gy = cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=3)
-    sobel = cv2.magnitude(gx, gy)
-    sobel = cv2.convertScaleAbs(sobel)
-
-    # Laplacien
-    lap = cv2.Laplacian(img_gray, cv2.CV_64F)
-    lap = cv2.convertScaleAbs(lap)
-
-    # Canny
-    canny = cv2.Canny(img_gray, int(th1), int(th2))
-
-    # Superposition
-    overlay = img_rgb.copy()
-    overlay[canny > 0] = [255, 0, 0] 
-    final_overlay = cv2.addWeighted(img_rgb, 0.7, overlay, 0.3, 0)
-
-    # 4. Affichage
-    ax_overlay.clear()
-    ax_overlay.imshow(final_overlay)
-    ax_overlay.set_title("1. Originale + Contours")
-    ax_overlay.axis('off')
-
+    # 4. Nettoyage des autres cases (pour l'instant vides)
     ax_sobel.clear()
-    ax_sobel.imshow(sobel, cmap='gray')
-    ax_sobel.set_title("2. Sobel")
+    ax_sobel.text(0.5, 0.5, "Emplacement Sobel", ha='center')
     ax_sobel.axis('off')
 
     ax_lap.clear()
-    ax_lap.imshow(lap, cmap='gray')
-    ax_lap.set_title("3. Laplacien")
+    ax_lap.text(0.5, 0.5, "Emplacement Laplacien", ha='center')
     ax_lap.axis('off')
 
     ax_canny.clear()
-    ax_canny.imshow(canny, cmap='gray')
-    ax_canny.set_title(f"4. Canny ({int(th1)}, {int(th2)})")
+    ax_canny.text(0.5, 0.5, "Emplacement Canny", ha='center')
     ax_canny.axis('off')
 
+    # Rafraîchir l'écran
     fig.canvas.draw_idle()
 
-# --- 6. CONNEXION ---
-radio.on_clicked(update)
-s_seuil1.on_changed(update)
-s_seuil2.on_changed(update)
-
-update()
+# --- 6. LANCEMENT ---
+radio.on_clicked(update) # On lie le clic à la fonction
+update() # On lance une première fois
 plt.show()
