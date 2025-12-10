@@ -201,7 +201,7 @@ def creer_dessin_trait_woaw(img_rgb, seuil1=100, seuil2=127):
     
     # 1) Canny
     gris = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-    #flou = cv2.GaussianBlur(gris, (3, 3), 0)
+    flou = cv2.GaussianBlur(gris, (3, 3), 0)
     edges = cv2.Canny(flou, seuil1, seuil2)
 
     # 2) Inverser (traits noirs, fond blanc)
